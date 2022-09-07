@@ -3,16 +3,47 @@ package main
 import (
 	"chess/game"
 	"chess/util"
+	"fmt"
 	"image/color"
 
+	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
 var (
-	White color.RGBA = color.RGBA{255, 255, 255, 255}
-	Grey  color.RGBA = color.RGBA{127, 127, 127, 255}
-	Black color.RGBA = color.RGBA{0, 0, 0, 255}
+	White       color.RGBA = color.RGBA{255, 255, 255, 255}
+	Grey        color.RGBA = color.RGBA{127, 127, 127, 255}
+	Black       color.RGBA = color.RGBA{0, 0, 0, 255}
+	Yellow      color.RGBA = color.RGBA{242, 202, 92, 255}
+	LightYellow color.RGBA = color.RGBA{251, 245, 222, 255}
+	DarkBlue    color.RGBA = color.RGBA{0, 68, 116, 255}
 )
+
+var (
+	PieceImages map[game.Player]map[game.PieceType]*sdl.Texture
+)
+
+const (
+	assetsFolder string = "assets"
+)
+
+func LoadPieceImages(renderer *sdl.Renderer) (map[game.Player]map[game.PieceType]*sdl.Texture, error) {
+	pieceImages := map[game.Player]map[game.PieceType]*sdl.Texture{
+		game.White: {},
+		game.Black: {},
+	}
+
+	for _, v := range game.PieceTypes {
+		for _, p := range game.Players {
+			var err error
+			pieceImages[p][v], err = img.LoadTexture(renderer, fmt.Sprintf("%v/%v/%v.png", assetsFolder, game.PlayerToString[p], game.PieceTypeToString[v]))
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return pieceImages, nil
+}
 
 func Clear(renderer *sdl.Renderer, color color.RGBA) {
 	renderer.SetDrawColor(color.R, color.G, color.B, color.A)
@@ -24,17 +55,26 @@ func Rect(renderer *sdl.Renderer, rect *sdl.Rect, color color.RGBA) {
 	renderer.FillRect(rect)
 }
 
+func RectF(renderer *sdl.Renderer, rect *sdl.FRect, color color.RGBA) {
+	renderer.SetDrawColor(color.R, color.G, color.B, color.A)
+	renderer.FillRectF(rect)
+}
+
 func RenderState(renderer *sdl.Renderer, state *game.State, rect *sdl.Rect) {
-	cellW, cellH := int(rect.W/8), int(rect.H/8)
+	cellW, cellH := float32(rect.W)/8.0, float32(rect.H)/8.0
 	for i := 0; i <= 7; i++ {
 		for j := 0; j <= 7; j++ {
 			var sqCol color.RGBA
 			if (i+j)%2 == 0 {
-				sqCol = Grey
+				sqCol = LightYellow
 			} else {
-				sqCol = Black
+				sqCol = Yellow
 			}
-			Rect(renderer, &sdl.Rect{X: int32(int(rect.X) + cellW*i), Y: int32(int(rect.Y) + cellH*j), W: int32(cellW), H: int32(cellH)}, sqCol)
+			sqRect := &sdl.FRect{X: float32(rect.X) + cellW*float32(j), Y: float32(rect.Y) + cellH*float32(i), W: cellW, H: cellH}
+			RectF(renderer, sqRect, sqCol)
+			if state.Board[i][j] != nil {
+				renderer.CopyF(PieceImages[state.Board[i][j].Owner][state.Board[i][j].Type], nil, sqRect)
+			}
 		}
 	}
 }
@@ -57,6 +97,10 @@ func main() {
 		panic(err)
 	}
 	defer renderer.Destroy()
+	PieceImages, err = LoadPieceImages(renderer)
+	if err != nil {
+		panic(err)
+	}
 
 	renderer.SetDrawBlendMode(sdl.BLENDMODE_BLEND)
 

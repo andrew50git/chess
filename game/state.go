@@ -25,6 +25,27 @@ const (
 	Pawn
 )
 
+var (
+	PieceTypes []PieceType = []PieceType{
+		King, Rook, Bishop, Queen, Knight, Pawn,
+	}
+	Players []Player = []Player{
+		White, Black,
+	}
+	PieceTypeToString map[PieceType]string = map[PieceType]string{
+		King:   "King",
+		Rook:   "Rook",
+		Bishop: "Bishop",
+		Queen:  "Queen",
+		Knight: "Knight",
+		Pawn:   "Pawn",
+	}
+	PlayerToString map[Player]string = map[Player]string{
+		White: "White",
+		Black: "Black",
+	}
+)
+
 type Piece struct {
 	Type  PieceType
 	Owner Player
