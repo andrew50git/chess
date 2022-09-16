@@ -154,6 +154,18 @@ func (state *State) RunMove(move Move) bool {
 	return isGameEnd
 }
 
+func (state *State) ReverseMove(move Move, captureType PieceType) {
+	state.Board[move.Start.X][move.Start.Y] = state.Board[move.End.X][move.End.Y]
+	state.Board[move.End.X][move.End.Y] = nil
+	if move.IsPassant {
+		state.Board[move.Start.X][move.Start.Y] = &Piece{Type: Pawn, Owner: state.Turn}
+	}
+	if move.Captures != nil {
+		state.Board[move.Captures.X][move.Captures.Y] = &Piece{Type: captureType, Owner: (state.Turn + 1) % 2}
+	}
+	//TODO:castling, cancastle...
+}
+
 type Move struct {
 	Start        Pos
 	End          Pos

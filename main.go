@@ -85,10 +85,13 @@ func RectF(renderer *sdl.Renderer, rect *sdl.FRect, color color.RGBA) {
 
 func TextF(renderer *sdl.Renderer, text string, posX float32, posY float32, font *ttf.Font, color color.RGBA) {
 	textSurf, err := openSans.RenderUTF8Solid(text, sdl.Color{R: color.R, G: color.G, B: color.B, A: color.A})
+	defer textSurf.Free()
 	if err != nil {
 		panic(err)
 	}
 	textTex, err := renderer.CreateTextureFromSurface(textSurf)
+	defer textTex.Destroy()
+
 	if err != nil {
 		panic(err)
 	}
@@ -282,12 +285,13 @@ func main() {
 			}
 		}
 		//end event loop
-		if state.Turn != humanPlayer { //engine move
-			engineMoves := state.GetEngineMoves((humanPlayer + 1) % 2) //TODO: other player func
-			m := engineMoves[engine.GetBestMove(state, engineMoves)]
+		if !isGameEnd && state.Turn != humanPlayer { //engine move
+			m := *engine.GetBestMove(state, (humanPlayer+1)%2)
 			state.RunMove(m)
 			uiState.prevMoveStart = &game.Pos{X: m.Start.X, Y: m.Start.Y}
 			state.Turn = humanPlayer
 		}
 	}
 }
+
+//TODO:DRAWS!!! (no valid moves, not checked)
