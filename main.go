@@ -1,6 +1,7 @@
 package main
 
 import (
+	"chess/deepcopy"
 	"chess/engine"
 	"chess/game"
 	"chess/util"
@@ -33,11 +34,19 @@ const (
 )
 
 type UIState struct {
-	gameState     *game.State
-	selected      *game.Pos //selected, convertMenu are inverted from screen coordinates
-	convertMenu   *game.Pos
-	winner        game.Player
-	prevMoveStart *game.Pos
+	gameState        *game.State
+	selected         *game.Pos //selected, convertMenu are inverted from screen coordinates
+	convertMenu      *game.Pos
+	prevMoveStart    *game.Pos
+	isEngineThinking bool
+}
+
+func (uiState *UIState) EndGame(winner game.Player) {
+	uiState.gameState.Winner = winner
+	uiState.gameState.IsGameEnd = true
+	uiState.convertMenu = nil
+	uiState.selected = nil
+	uiState.prevMoveStart = nil
 }
 
 func LoadPieceImages(renderer *sdl.Renderer) error {
@@ -83,7 +92,7 @@ func RectF(renderer *sdl.Renderer, rect *sdl.FRect, color color.RGBA) {
 	renderer.FillRectF(rect)
 }
 
-func TextF(renderer *sdl.Renderer, text string, posX float32, posY float32, font *ttf.Font, color color.RGBA) {
+func TextF(renderer *sdl.Renderer, text string, posX float32, posY float32, font *ttf.Font, color color.RGBA, center bool) {
 	textSurf, err := openSans.RenderUTF8Solid(text, sdl.Color{R: color.R, G: color.G, B: color.B, A: color.A})
 	defer textSurf.Free()
 	if err != nil {
@@ -97,7 +106,11 @@ func TextF(renderer *sdl.Renderer, text string, posX float32, posY float32, font
 	}
 	textW := float32(textSurf.W)
 	textH := float32(textSurf.H)
-	textRect := &sdl.FRect{X: posX - textW/2, Y: posY - textH/2, W: textW, H: textH}
+	textRect := &sdl.FRect{X: posX, Y: posY, W: textW, H: textH}
+	if center {
+		textRect.X -= textW / 2
+		textRect.Y -= textH / 2
+	}
 	renderer.CopyF(textTex, nil, textRect)
 }
 
@@ -160,8 +173,18 @@ func RenderState(renderer *sdl.Renderer, uiState *UIState, rect *sdl.FRect) {
 		renderer.CopyF(pieceImages[state.Turn][game.Rook], nil, sqRect)
 	}
 
-	if uiState.winner != game.NilPlayer {
-		TextF(renderer, fmt.Sprintf("%v won", game.PlayerToString[uiState.winner]), rect.X+rect.W/2, rect.Y+rect.H/2, openSans, black)
+	if uiState.gameState.Winner != game.NilPlayer {
+		winText := ""
+		if uiState.gameState.Winner == game.Both {
+			winText = "Stalemate"
+		} else {
+			winText = fmt.Sprintf("%v won", game.PlayerToString[uiState.gameState.Winner])
+		}
+		TextF(renderer, winText, rect.X+rect.W/2, rect.Y+rect.H/2, openSans, black, true)
+	}
+
+	if uiState.isEngineThinking {
+		TextF(renderer, "Engine thinking...", 0, 0, openSans, black, false)
 	}
 }
 
@@ -201,9 +224,9 @@ func main() {
 
 	humanPlayer := game.White
 	state := game.NewStartState(humanPlayer)
-	uiState := &UIState{state, nil, nil, game.NilPlayer, nil}
+	uiState := &UIState{state, nil, nil, nil, false}
 	running := true
-	isGameEnd := false
+	engineCh := make(chan *game.Move, 1)
 	for running {
 		Clear(renderer, white)
 		w, h := window.GetSize()
@@ -225,7 +248,7 @@ func main() {
 			case *sdl.QuitEvent:
 				running = false
 			case *sdl.MouseButtonEvent:
-				if isGameEnd {
+				if state.IsGameEnd {
 					break eventLoop
 				}
 				if e.Button == sdl.BUTTON_LEFT && e.Type == sdl.MOUSEBUTTONDOWN {
@@ -265,10 +288,13 @@ func main() {
 							moves := state.GetMoves(state.Turn)
 							for _, m := range moves {
 								if m.Start.X == uiState.selected.Y && m.Start.Y == uiState.selected.X && m.End.X == sqR && m.End.Y == sqC {
-									isGameEnd = state.RunMove(m)
+									state.IsGameEnd = state.RunMove(m)
 									uiState.prevMoveStart = &game.Pos{X: m.Start.X, Y: m.Start.Y}
-									if isGameEnd {
-										uiState.winner = state.Turn
+									if state.IsGameEnd {
+										uiState.EndGame(state.Turn)
+									}
+									if len(state.GetMoves(state.Turn)) == 0 {
+										uiState.EndGame(game.Both)
 									}
 									if m.IsConversion && m.ConvertType == game.NilPiece {
 										uiState.convertMenu = &game.Pos{X: m.End.X, Y: m.End.Y}
@@ -285,11 +311,25 @@ func main() {
 			}
 		}
 		//end event loop
-		if !isGameEnd && state.Turn != humanPlayer { //engine move
-			m := *engine.GetBestMove(state, (humanPlayer+1)%2)
-			state.RunMove(m)
-			uiState.prevMoveStart = &game.Pos{X: m.Start.X, Y: m.Start.Y}
-			state.Turn = humanPlayer
+		if !state.IsGameEnd && state.Turn != humanPlayer && !uiState.isEngineThinking { //engine move
+			copiedState, _ := deepcopy.Anything(state)
+			go engine.GetBestMove(copiedState.(*game.State), (humanPlayer+1)%2, engineCh)
+			uiState.isEngineThinking = true
+		}
+		if len(engineCh) > 0 {
+			uiState.isEngineThinking = false
+			m := <-engineCh
+			if m == nil {
+				uiState.EndGame(game.Both)
+			} else {
+				state.IsGameEnd = state.RunMove(*m)
+				if state.IsGameEnd {
+					uiState.EndGame(state.Turn)
+				}
+
+				uiState.prevMoveStart = &game.Pos{X: m.Start.X, Y: m.Start.Y}
+				state.Turn = humanPlayer
+			}
 		}
 	}
 }

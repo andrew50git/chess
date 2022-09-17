@@ -18,6 +18,7 @@ var NilPlayer Player = -1
 const (
 	White Player = iota
 	Black
+	Both
 )
 
 type PieceType int
@@ -51,6 +52,7 @@ var (
 	PlayerToString map[Player]string = map[Player]string{
 		White: "White",
 		Black: "Black",
+		Both:  "Both",
 	}
 )
 
@@ -101,6 +103,8 @@ func NewStartState(starter Player) *State {
 		White: true,
 		Black: true,
 	}
+	state.IsGameEnd = false
+	state.Winner = NilPlayer
 	return state
 }
 
@@ -111,6 +115,8 @@ type State struct {
 	CanCastleLong  map[Player]bool
 	CanCastleShort map[Player]bool
 	Starter        Player
+	IsGameEnd      bool
+	Winner         Player
 }
 
 func (state *State) Add(pos Pos, piece Piece) {
@@ -135,11 +141,11 @@ func (state *State) RunMove(move Move) bool {
 		}
 	}
 	isGameEnd := false
-	if move.Captures != nil {
-		if state.Board[move.Captures.X][move.Captures.Y].Type == King {
+	if move.Capture != nil {
+		if state.Board[move.Capture.X][move.Capture.Y].Type == King {
 			isGameEnd = true
 		}
-		state.Board[move.Captures.X][move.Captures.Y] = nil
+		state.Board[move.Capture.X][move.Capture.Y] = nil
 	}
 
 	state.PassantPos = nil
@@ -154,14 +160,17 @@ func (state *State) RunMove(move Move) bool {
 	return isGameEnd
 }
 
-func (state *State) ReverseMove(move Move, captureType PieceType) {
+func (state *State) ReverseMove(move Move, captureType PieceType, convertType PieceType) {
 	state.Board[move.Start.X][move.Start.Y] = state.Board[move.End.X][move.End.Y]
 	state.Board[move.End.X][move.End.Y] = nil
 	if move.IsPassant {
 		state.Board[move.Start.X][move.Start.Y] = &Piece{Type: Pawn, Owner: state.Turn}
 	}
-	if move.Captures != nil {
-		state.Board[move.Captures.X][move.Captures.Y] = &Piece{Type: captureType, Owner: (state.Turn + 1) % 2}
+	if move.Capture != nil {
+		state.Board[move.Capture.X][move.Capture.Y] = &Piece{Type: captureType, Owner: (state.Turn + 1) % 2}
+	}
+	if move.IsConversion {
+		state.Board[move.Start.X][move.Start.Y].Type = Pawn
 	}
 	//TODO:castling, cancastle...
 }
@@ -169,7 +178,7 @@ func (state *State) ReverseMove(move Move, captureType PieceType) {
 type Move struct {
 	Start        Pos
 	End          Pos
-	Captures     *Pos // can be nil
+	Capture      *Pos // can be nil
 	IsConversion bool // for pawns only
 	ConvertType  PieceType
 	IsCastle     bool // for kings only, moves the rook to middle of start and end
@@ -335,11 +344,15 @@ func (state *State) GetEngineMoves(player Player) []Move {
 	for _, m := range moves {
 		if m.IsConversion {
 			m.ConvertType = Queen
-			resMoves = append(resMoves, m)
+			resMoves = append([]Move{m}, resMoves...)
 			m.ConvertType = Knight
-			resMoves = append(resMoves, m)
+			resMoves = append([]Move{m}, resMoves...)
 		} else {
-			resMoves = append(resMoves, m)
+			if m.Capture != nil {
+				resMoves = append([]Move{m}, resMoves...)
+			} else {
+				resMoves = append(resMoves, m)
+			}
 		}
 	}
 	return resMoves

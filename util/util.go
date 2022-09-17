@@ -31,3 +31,11 @@ func Min(a, b int) int {
 		return b
 	}
 }
+
+func Abs(x float32) float32 {
+	if x < 0 {
+		return -x
+	} else {
+		return x
+	}
+}
