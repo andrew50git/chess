@@ -23,7 +23,7 @@ var (
 )
 
 func GetBestMove(state *game.State, player game.Player, ch chan *game.Move) {
-	depth := 5
+	depth := 1
 	moves := state.GetEngineMoves(player)
 	var best *game.Move
 	var moveI int
@@ -32,8 +32,8 @@ func GetBestMove(state *game.State, player game.Player, ch chan *game.Move) {
 		best, moveI, _ = getBestMove(state, moves, player, depth, BigNum)
 		moves = util.RemoveIndex(moves, moveI)
 		moves = append([]game.Move{*best}, moves...) //TODO: multiple move priority
-		depth++
 		fmt.Println(depth, best)
+		depth++
 	}
 	ch <- best
 }
