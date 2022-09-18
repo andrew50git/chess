@@ -38,6 +38,7 @@ type UIState struct {
 	selected         *game.Pos //selected, convertMenu are inverted from screen coordinates
 	convertMenu      *game.Pos
 	prevMoveStart    *game.Pos
+	prevMoveEnd      *game.Pos
 	isEngineThinking bool
 }
 
@@ -122,7 +123,7 @@ func RenderState(renderer *sdl.Renderer, uiState *UIState, rect *sdl.FRect) {
 
 	for i := 0; i <= 7; i++ {
 		for j := 0; j <= 7; j++ {
-			if uiState.selected != nil && uiState.selected.X == j && uiState.selected.Y == i {
+			if uiState.selected != nil && uiState.selected.X == i && uiState.selected.Y == j {
 				for _, m := range moves {
 					if m.Start.X == i && m.Start.Y == j {
 						movingPoints = append(movingPoints, m.End)
@@ -140,7 +141,7 @@ func RenderState(renderer *sdl.Renderer, uiState *UIState, rect *sdl.FRect) {
 			} else {
 				sqCol = yellow
 			}
-			if uiState.selected != nil && uiState.selected.X == j && uiState.selected.Y == i {
+			if (uiState.selected != nil && uiState.selected.X == i && uiState.selected.Y == j) || (uiState.prevMoveEnd != nil && uiState.prevMoveEnd.X == i && uiState.prevMoveEnd.Y == j) {
 				sqCol = darkBlue
 			}
 			sqRect := &sdl.FRect{X: float32(rect.X) + cellW*float32(j), Y: float32(rect.Y) + cellH*float32(i), W: cellW, H: cellH}
@@ -224,7 +225,7 @@ func main() {
 
 	humanPlayer := game.White
 	state := game.NewStartState(humanPlayer)
-	uiState := &UIState{state, nil, nil, nil, false}
+	uiState := &UIState{state, nil, nil, nil, nil, false}
 	running := true
 	engineCh := make(chan *game.Move, 1)
 	for running {
@@ -279,17 +280,18 @@ func main() {
 
 						//selecting own piece
 						if state.Board[sqR][sqC] != nil && state.Board[sqR][sqC].Owner == state.Turn && state.Turn == humanPlayer {
-							if uiState.selected != nil && uiState.selected.X == sqC && uiState.selected.Y == sqR {
+							if uiState.selected != nil && uiState.selected.X == sqR && uiState.selected.Y == sqC {
 								uiState.selected = nil
 							} else {
-								uiState.selected = &game.Pos{X: sqC, Y: sqR}
+								uiState.selected = &game.Pos{X: sqR, Y: sqC}
 							}
 						} else if uiState.selected != nil && state.Turn == humanPlayer { //selecting place to move
 							moves := state.GetMoves(state.Turn)
 							for _, m := range moves {
-								if m.Start.X == uiState.selected.Y && m.Start.Y == uiState.selected.X && m.End.X == sqR && m.End.Y == sqC {
+								if m.Start.X == uiState.selected.X && m.Start.Y == uiState.selected.Y && m.End.X == sqR && m.End.Y == sqC {
 									state.IsGameEnd = state.RunMove(m)
 									uiState.prevMoveStart = &game.Pos{X: m.Start.X, Y: m.Start.Y}
+									uiState.prevMoveEnd = &game.Pos{X: m.End.X, Y: m.End.Y}
 									if state.IsGameEnd {
 										uiState.EndGame(state.Turn)
 									}
@@ -328,6 +330,7 @@ func main() {
 				}
 
 				uiState.prevMoveStart = &game.Pos{X: m.Start.X, Y: m.Start.Y}
+				uiState.prevMoveEnd = &game.Pos{X: m.End.X, Y: m.End.Y}
 				state.Turn = humanPlayer
 			}
 		}

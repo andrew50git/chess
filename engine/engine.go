@@ -4,6 +4,7 @@ import (
 	"chess/game"
 	"chess/util"
 	"fmt"
+	"time"
 )
 
 var (
@@ -22,30 +23,25 @@ var (
 )
 
 func GetBestMove(state *game.State, player game.Player, ch chan *game.Move) {
-	piecesLeft := 0
-	for i := 0; i <= 7; i++ {
-		for j := 0; j <= 7; j++ {
-			if state.Board[i][j] != nil {
-				piecesLeft++
-			}
-		}
-	}
 	depth := 5
-	if piecesLeft <= 7 {
-		depth += (7 - piecesLeft) / 2
+	moves := state.GetEngineMoves(player)
+	var best *game.Move
+	var moveI int
+	start := time.Now()
+	for time.Since(start) < time.Second {
+		best, moveI, _ = getBestMove(state, moves, player, depth, BigNum)
+		moves = util.RemoveIndex(moves, moveI)
+		moves = append([]game.Move{*best}, moves...) //TODO: multiple move priority
+		depth++
+		fmt.Println(depth, best)
 	}
-	best, _ := getBestMove(state, player, depth, BigNum)
 	ch <- best
 }
 
-func getBestMove(state *game.State, player game.Player, depth int, max float32) (*game.Move, float32) {
+func getBestMove(state *game.State, moves []game.Move, player game.Player, depth int, max float32) (*game.Move, int, float32) {
 	state.Turn = player
-	moves := state.GetEngineMoves(player)
 	bestI := -1
 	bestEval := -BigNum
-	if len(moves) == 0 {
-		fmt.Println(depth)
-	}
 	for i, m := range moves {
 		captureType := game.NilPiece
 		convertType := game.NilPiece
@@ -55,12 +51,16 @@ func getBestMove(state *game.State, player game.Player, depth int, max float32) 
 		if m.ConvertType != captureType {
 			convertType = m.ConvertType
 		}
+
+		if captureType == game.King {
+			return &moves[i], i, BigNum
+		}
 		state.RunMove(m)
 		var ev float32
 		if depth == 1 {
 			ev = evalState(state, player)
 		} else {
-			_, ev = getBestMove(state, (player+1)%2, depth-1, -bestEval)
+			_, _, ev = getBestMove(state, state.GetEngineMoves((player+1)%2), (player+1)%2, depth-1, -bestEval)
 			ev = -ev
 			state.Turn = player
 		}
@@ -75,13 +75,15 @@ func getBestMove(state *game.State, player game.Player, depth int, max float32) 
 		}
 	}
 	if bestI == -1 {
-		return nil, -BigNum
+		return nil, -1, -BigNum
 	}
-	return &moves[bestI], bestEval
+	return &moves[bestI], bestI, bestEval
 }
 
 func evalState(state *game.State, pov game.Player) float32 {
 	var res float32 = 0
+	//res += 0.1 * float32(len(state.GetMoves(pov)))
+	//res -= 0.1 * float32(len(state.GetMoves((pov+1)%2)))
 	for i := 0; i <= 7; i++ {
 		for j := 0; j <= 7; j++ {
 			if state.Board[i][j] != nil {

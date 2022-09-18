@@ -261,22 +261,7 @@ func (state *State) GetMoves(player Player) []Move { //TODO: CASTLING
 						moves = append(moves, Move{Pos{i, j}, Pos{i + dir, j + 1}, &Pos{i, j + 1}, false, NilPiece, false, true})
 					}
 				case Knight:
-					knightDirs := []Pos{}
-					for _, swap := range []bool{false, true} {
-						for _, neg1 := range []int{-1, 1} {
-							for _, neg2 := range []int{-1, 1} {
-								var x, y int
-								if swap {
-									x, y = 1, 2
-								} else {
-									x, y = 2, 1
-								}
-								x *= neg1
-								y *= neg2
-								knightDirs = append(knightDirs, Pos{x, y})
-							}
-						}
-					}
+					knightDirs := []Pos{{1, 2}, {-1, 2}, {1, -2}, {-1, -2}, {2, 1}, {-2, 1}, {2, -1}, {-2, -1}}
 					for _, dir := range knightDirs {
 						newPos := Pos{i, j}.Add(dir)
 						if OnBoard(newPos) && (state.Board[newPos.X][newPos.Y] == nil || state.Board[newPos.X][newPos.Y].Owner == oppPlayer) {
@@ -308,29 +293,31 @@ func (state *State) GetMoves(player Player) []Move { //TODO: CASTLING
 							moves = append(moves, MakeBasicMove(Pos{i, j}, newPos, capture))
 						}
 					}
-					if state.CanCastleLong[player] || state.CanCastleShort[player] {
-						oppAttacks := state.GetAttacks(oppPlayer)
-						var playerRank int
-						if player == state.Starter {
-							playerRank = 7
-						} else {
-							playerRank = 0
-						}
-						if state.CanCastleShort[player] {
-							if state.Board[playerRank][5] == nil && state.Board[playerRank][6] == nil &&
-								!oppAttacks[playerRank][4] && !oppAttacks[playerRank][5] && !oppAttacks[playerRank][6] {
-								//can castle short
+					/*
+						if state.CanCastleLong[player] || state.CanCastleShort[player] {
+							oppAttacks := state.GetAttacks(oppPlayer)
+							var playerRank int
+							if player == state.Starter {
+								playerRank = 7
+							} else {
+								playerRank = 0
+							}
+							if state.CanCastleShort[player] {
+								if state.Board[playerRank][5] == nil && state.Board[playerRank][6] == nil &&
+									!oppAttacks[playerRank][4] && !oppAttacks[playerRank][5] && !oppAttacks[playerRank][6] {
+									//can castle short
 
+								}
+							}
+							if state.CanCastleLong[player] {
+								if state.Board[playerRank][1] == nil && state.Board[playerRank][2] == nil && state.Board[playerRank][3] == nil &&
+									!oppAttacks[playerRank][2] && !oppAttacks[playerRank][3] && !oppAttacks[playerRank][4] {
+									//can castle long
+
+								}
 							}
 						}
-						if state.CanCastleLong[player] {
-							if state.Board[playerRank][1] == nil && state.Board[playerRank][2] == nil && state.Board[playerRank][3] == nil &&
-								!oppAttacks[playerRank][2] && !oppAttacks[playerRank][3] && !oppAttacks[playerRank][4] {
-								//can castle long
-
-							}
-						}
-					}
+					*/
 				}
 			}
 		}
