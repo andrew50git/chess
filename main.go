@@ -225,7 +225,6 @@ func main() {
 
 	humanPlayer := game.White
 	state := game.NewStartState(humanPlayer)
-	state.Board = [][]*game.Piece{{&game.Piece{game.Rook, game.Black}, nil, nil, nil, nil, &game.Piece{game.King, game.White}, nil, nil}, {nil, nil, nil, nil, nil, nil, nil, nil}, {nil, nil, nil, nil, &game.Piece{game.King, game.Black}, nil, nil, nil}, {nil, nil, nil, nil, nil, nil, nil, nil}, {nil, nil, nil, nil, nil, nil, nil, nil}, {nil, nil, nil, nil, nil, nil, nil, nil}, {nil, nil, nil, nil, nil, nil, nil, nil}, {nil, nil, nil, nil, nil, nil, nil, nil}}
 	uiState := &UIState{state, nil, nil, nil, nil, false}
 	running := true
 	engineCh := make(chan *game.Move, 1)
