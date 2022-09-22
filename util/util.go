@@ -24,7 +24,7 @@ func Contains[T comparable](s []T, value T) bool {
 	return false
 }
 
-func Min(a, b int) int {
+func Min[T int | float32](a, b T) T {
 	if a < b {
 		return a
 	} else {
@@ -32,7 +32,15 @@ func Min(a, b int) int {
 	}
 }
 
-func Abs(x float32) float32 {
+func Max[T int | float32](a, b T) T {
+	if a > b {
+		return a
+	} else {
+		return b
+	}
+}
+
+func Abs[T int | float32](x T) T {
 	if x < 0 {
 		return -x
 	} else {

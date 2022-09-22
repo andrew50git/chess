@@ -4,6 +4,7 @@ import (
 	"chess/game"
 	"chess/util"
 	"fmt"
+	"sort"
 	"time"
 )
 
@@ -19,17 +20,17 @@ var (
 )
 
 var (
-	BigNum float32 = 100000
+	BigNum float32 = 10000000
 )
 
 func GetBestMove(state *game.State, player game.Player, ch chan *game.Move) {
 	depth := 1
-	moves := state.GetEngineMoves(player)
+	moves := GetEngineMoves(state, player)
 	var best *game.Move
 	var moveI int
 	start := time.Now()
-	for time.Since(start) < time.Second {
-		best, moveI, _ = getBestMove(state, moves, player, depth, BigNum)
+	for time.Since(start) < time.Second*1 {
+		best, moveI, _ = getBestMove(state, moves, player, depth, -BigNum, BigNum)
 		moves = util.RemoveIndex(moves, moveI)
 		moves = append([]game.Move{*best}, moves...) //TODO: multiple move priority
 		fmt.Println(depth, best)
@@ -38,7 +39,7 @@ func GetBestMove(state *game.State, player game.Player, ch chan *game.Move) {
 	ch <- best
 }
 
-func getBestMove(state *game.State, moves []game.Move, player game.Player, depth int, max float32) (*game.Move, int, float32) {
+func getBestMove(state *game.State, moves []game.Move, player game.Player, depth int, min, max float32) (*game.Move, int, float32) {
 	state.Turn = player
 	bestI := -1
 	bestEval := -BigNum
@@ -53,14 +54,14 @@ func getBestMove(state *game.State, moves []game.Move, player game.Player, depth
 		}
 
 		if captureType == game.King {
-			return &moves[i], i, BigNum
+			return &moves[i], i, BigNum - 1
 		}
 		state.RunMove(m)
 		var ev float32
 		if depth == 1 {
 			ev = evalState(state, player)
 		} else {
-			_, _, ev = getBestMove(state, state.GetEngineMoves((player+1)%2), (player+1)%2, depth-1, -bestEval)
+			_, _, ev = getBestMove(state, GetEngineMoves(state, (player+1)%2), (player+1)%2, depth-1, -max, -min)
 			ev = -ev
 			state.Turn = player
 		}
@@ -68,9 +69,10 @@ func getBestMove(state *game.State, moves []game.Move, player game.Player, depth
 			bestEval = ev
 			bestI = i
 		}
+		min = util.Max(min, bestEval)
 		state.ReverseMove(m, captureType, convertType)
 
-		if ev >= max {
+		if min >= max {
 			break
 		}
 	}
@@ -80,6 +82,7 @@ func getBestMove(state *game.State, moves []game.Move, player game.Player, depth
 	return &moves[bestI], bestI, bestEval
 }
 
+// TODO: piece maps
 func evalState(state *game.State, pov game.Player) float32 {
 	var res float32 = 0
 	//res += 0.1 * float32(len(state.GetMoves(pov)))
@@ -109,4 +112,27 @@ func evalState(state *game.State, pov game.Player) float32 {
 	return res
 }
 
-//TODO: move uistate.winner to state
+func evalMove(state *game.State, move game.Move) float32 {
+	var res float32 = 0
+	if move.Capture != nil {
+		res += pieceTypeToValue[state.Board[move.Capture.X][move.Capture.Y].Type]
+        res -= pieceTypeToValue[state.Board[move.Start.X][move.Start.Y].Type]*0.1
+	}
+	if move.IsConversion {
+		res += 10 + pieceTypeToValue[move.ConvertType]
+	}
+	return res
+}
+
+// TODO: move uistate.winner to state
+func GetEngineMoves(state *game.State, player game.Player) []game.Move {
+	moves := state.GetMoves(player)
+	moveEvals := []float32{}
+	for _, m := range moves {
+		moveEvals = append(moveEvals, evalMove(state, m))
+	}
+	sort.Slice(moves, func(i, j int) bool {
+		return moveEvals[i] > moveEvals[j]
+	})
+	return moves
+}

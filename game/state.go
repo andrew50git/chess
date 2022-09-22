@@ -325,22 +325,3 @@ func (state *State) GetMoves(player Player) []Move { //TODO: CASTLING
 	return moves
 }
 
-func (state *State) GetEngineMoves(player Player) []Move {
-	moves := state.GetMoves(player)
-	resMoves := []Move{}
-	for _, m := range moves {
-		if m.IsConversion {
-			m.ConvertType = Queen
-			resMoves = append([]Move{m}, resMoves...)
-			m.ConvertType = Knight
-			resMoves = append([]Move{m}, resMoves...)
-		} else {
-			if m.Capture != nil {
-				resMoves = append([]Move{m}, resMoves...)
-			} else {
-				resMoves = append(resMoves, m)
-			}
-		}
-	}
-	return resMoves
-}
