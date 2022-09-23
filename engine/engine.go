@@ -11,8 +11,8 @@ import (
 var (
 	pieceTypeToValue map[game.PieceType]float32 = map[game.PieceType]float32{
 		game.Pawn:   1,
-		game.Knight: 3,
-		game.Bishop: 3,
+		game.Knight: 3.2,
+		game.Bishop: 3.3,
 		game.Rook:   5,
 		game.Queen:  9,
 		game.King:   1000,
@@ -23,13 +23,22 @@ var (
 	BigNum float32 = 10000000
 )
 
+type TranspositionState struct {
+}
+
+var Transpositions map[uint64]*TranspositionState
+
+func Init() {
+	InitZobrist()
+}
+
 func GetBestMove(state *game.State, player game.Player, ch chan *game.Move) {
 	depth := 1
 	moves := GetEngineMoves(state, player)
 	var best *game.Move
 	var moveI int
 	start := time.Now()
-	for time.Since(start) < time.Second*1 {
+	for time.Since(start) < time.Second*5 {
 		best, moveI, _ = getBestMove(state, moves, player, depth, -BigNum, BigNum)
 		moves = util.RemoveIndex(moves, moveI)
 		moves = append([]game.Move{*best}, moves...) //TODO: multiple move priority
@@ -82,6 +91,10 @@ func getBestMove(state *game.State, moves []game.Move, player game.Player, depth
 	return &moves[bestI], bestI, bestEval
 }
 
+var (
+	PawnMap [][]float32 = [][]float32{{0, 0, 0, 0, 0, 0, 0, 0}, {0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5}, {0.1, 0.1, 0.2, 0.3, 0.3, 0.2, 0.1, 0.1}, {0.05, 0.05, 0.1, 0.25, 0.25, 0.1, 0.05, 0.05}, {0, 0, 0, 0.2, 0.2, 0, 0, 0}, {0.05, -0.05, -0.1, 0, 0, -0.1, -0.05, 0.05}, {0.05, 0.1, 0.1, -0.2, -0.2, 0.1, 0.1, 0.05}, {0, 0, 0, 0, 0, 0, 0, 0}}
+)
+
 // TODO: piece maps
 func evalState(state *game.State, pov game.Player) float32 {
 	var res float32 = 0
@@ -95,7 +108,7 @@ func evalState(state *game.State, pov game.Player) float32 {
 				} else {
 					res -= pieceTypeToValue[state.Board[i][j].Type]
 				}
-				if state.Board[i][j].Type == game.Knight || state.Board[i][j].Type == game.Pawn {
+				if state.Board[i][j].Type == game.Knight {
 					rowValue := pieceTypeToValue[state.Board[i][j].Type] * ((3.5 - util.Abs(float32(i)-3.5)) / 7)
 					colValue := pieceTypeToValue[state.Board[i][j].Type] * ((3.5 - util.Abs(float32(j)-3.5)) / 7)
 					if state.Board[i][j].Owner == pov {
@@ -104,6 +117,21 @@ func evalState(state *game.State, pov game.Player) float32 {
 					} else {
 						res -= rowValue
 						res -= colValue
+					}
+				}
+				if state.Board[i][j].Type == game.Pawn {
+					if state.Board[i][j].Owner == pov {
+						if state.Board[i][j].Owner == state.Starter {
+							res += PawnMap[i][j]
+						} else {
+							res += PawnMap[7-i][j]
+						}
+					} else {
+						if state.Board[i][j].Owner == state.Starter {
+							res -= PawnMap[i][j]
+						} else {
+							res -= PawnMap[7-i][j]
+						}
 					}
 				}
 			}
@@ -116,7 +144,7 @@ func evalMove(state *game.State, move game.Move) float32 {
 	var res float32 = 0
 	if move.Capture != nil {
 		res += pieceTypeToValue[state.Board[move.Capture.X][move.Capture.Y].Type]
-        res -= pieceTypeToValue[state.Board[move.Start.X][move.Start.Y].Type]*0.1
+		res -= pieceTypeToValue[state.Board[move.Start.X][move.Start.Y].Type] * 0.1
 	}
 	if move.IsConversion {
 		res += 10 + pieceTypeToValue[move.ConvertType]

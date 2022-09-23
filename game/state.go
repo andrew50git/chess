@@ -62,14 +62,15 @@ type Piece struct {
 }
 
 var (
-	StartPieces [][]PieceType = [][]PieceType{{Pawn, Pawn, Pawn, Pawn, Pawn, Pawn, Pawn, Pawn}, {Rook, Knight, Bishop, Queen, King, Bishop, Knight, Rook}}
+	StartPieces       [][]PieceType                   = [][]PieceType{{Pawn, Pawn, Pawn, Pawn, Pawn, Pawn, Pawn, Pawn}, {Rook, Knight, Bishop, Queen, King, Bishop, Knight, Rook}}
+	PieceTypeToSymbol map[Player]map[PieceType]string = map[Player]map[PieceType]string{White: {King: "♔", Queen: "♕", Rook: "♖", Bishop: "♗", Knight: "♘", Pawn: "♙"}, Black: {King: "♚", Queen: "♛", Rook: "♜", Bishop: "♝", Knight: "♞", Pawn: "♟"}}
 )
 
 func PrintBoard(board [][]*Piece) {
 	for i := 0; i <= 7; i++ {
 		for j := 0; j <= 7; j++ {
 			if board[i][j] != nil {
-				fmt.Printf("%v ", board[i][j].Type)
+				fmt.Printf("%v ", PieceTypeToSymbol[board[i][j].Owner][board[i][j].Type])
 			} else {
 				fmt.Printf("  ")
 			}
@@ -324,4 +325,3 @@ func (state *State) GetMoves(player Player) []Move { //TODO: CASTLING
 	}
 	return moves
 }
-

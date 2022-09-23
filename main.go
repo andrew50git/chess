@@ -1,6 +1,7 @@
 package main
 
 import (
+	"chess/bench"
 	"chess/deepcopy"
 	"chess/engine"
 	"chess/game"
@@ -190,6 +191,10 @@ func RenderState(renderer *sdl.Renderer, uiState *UIState, rect *sdl.FRect) {
 }
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "bench" {
+		bench.Bench()
+		return
+	}
 	if err := sdl.Init(sdl.INIT_EVERYTHING); err != nil {
 		panic(err)
 	}
@@ -220,6 +225,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	engine.Init()
 
 	renderer.SetDrawBlendMode(sdl.BLENDMODE_BLEND)
 
@@ -313,9 +319,9 @@ func main() {
 			}
 		}
 		//end event loop
-		if !state.IsGameEnd && state.Turn != humanPlayer && !uiState.isEngineThinking { //engine move
+		if !state.IsGameEnd && /*state.Turn != humanPlayer &&*/ !uiState.isEngineThinking { //engine move
 			copiedState, _ := deepcopy.Anything(state)
-			go engine.GetBestMove(copiedState.(*game.State), (humanPlayer+1)%2, engineCh)
+			go engine.GetBestMove(copiedState.(*game.State), state.Turn, engineCh)
 			uiState.isEngineThinking = true
 		}
 		if len(engineCh) > 0 {
@@ -331,7 +337,7 @@ func main() {
 
 				uiState.prevMoveStart = &game.Pos{X: m.Start.X, Y: m.Start.Y}
 				uiState.prevMoveEnd = &game.Pos{X: m.End.X, Y: m.End.Y}
-				state.Turn = humanPlayer
+				state.Turn = (state.Turn + 1) % 2
 			}
 		}
 	}
