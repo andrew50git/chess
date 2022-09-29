@@ -9,9 +9,10 @@ var (
 	pieceTable   map[game.Player]map[game.PieceType][][]uint64 //player, piece type
 	castleTable  map[game.Player][]uint64                      //0: Long 1: Short
 	passantTable [][]uint64
+	blackToMove  uint64
 )
 
-func InitZobrist() {
+func initZobrist() {
 	passantTable = make([][]uint64, 8)
 	for i := 0; i <= 7; i++ {
 		passantTable[i] = make([]uint64, 8)
@@ -44,6 +45,7 @@ func InitZobrist() {
 		castleTable[p][0] = rand.Uint64()
 		castleTable[p][1] = rand.Uint64()
 	}
+	blackToMove = rand.Uint64()
 }
 
 func Hash(state *game.State) uint64 {
@@ -67,5 +69,38 @@ func Hash(state *game.State) uint64 {
 	if state.CanCastleShort[game.Black] {
 		ans ^= castleTable[game.Black][1]
 	}
+	if state.Turn == game.Black {
+		ans ^= blackToMove
+	}
+	if state.PassantPos != nil {
+		ans ^= passantTable[state.PassantPos.X][state.PassantPos.Y]
+	}
 	return ans
+}
+
+func RunMoveForHash(state *game.State, m *game.Move, hash uint64) uint64 {
+	//update hash
+	hash ^= pieceTable[state.Board[m.Start.X][m.Start.Y].Owner][state.Board[m.Start.X][m.Start.Y].Type][m.Start.X][m.Start.Y]
+	hash ^= pieceTable[state.Board[m.Start.X][m.Start.Y].Owner][state.Board[m.Start.X][m.Start.Y].Type][m.End.X][m.End.Y]
+	if m.Capture != nil {
+		hash ^= pieceTable[state.Board[m.Capture.X][m.Capture.Y].Owner][state.Board[m.Capture.X][m.Capture.Y].Type][m.Capture.X][m.Capture.Y]
+	}
+	//update hash passant
+	if state.PassantPos != nil {
+		hash ^= passantTable[state.PassantPos.X][state.PassantPos.Y]
+	}
+	if m.IsPassant {
+		hash ^= passantTable[m.End.X][m.End.Y]
+	}
+	//update hash castling
+	hash ^= castleTable[game.White][0]
+	hash ^= castleTable[game.Black][0]
+	hash ^= castleTable[game.White][0]
+	hash ^= castleTable[game.Black][1]
+	state.RunMove(*m)
+	hash ^= castleTable[game.White][0]
+	hash ^= castleTable[game.Black][0]
+	hash ^= castleTable[game.White][0]
+	hash ^= castleTable[game.Black][1]
+	return hash
 }

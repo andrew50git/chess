@@ -319,7 +319,7 @@ func main() {
 			}
 		}
 		//end event loop
-		if !state.IsGameEnd && /*state.Turn != humanPlayer &&*/ !uiState.isEngineThinking { //engine move
+		if !state.IsGameEnd && state.Turn != humanPlayer && !uiState.isEngineThinking { //engine move
 			copiedState, _ := deepcopy.Anything(state)
 			go engine.GetBestMove(copiedState.(*game.State), state.Turn, engineCh)
 			uiState.isEngineThinking = true
