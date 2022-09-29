@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"chess/deepcopy"
 	"chess/game"
 	"chess/util"
 	"fmt"
@@ -61,13 +62,24 @@ func GetBestMove(state *game.State, player game.Player, ch chan *game.Move) {
 	if isEndGame {
 		pieceMaps[game.King] = kingMapEndGame
 	}
-	depth := 1
+	depth := 2
 	moves := getEngineMoves(state, player)
 	var best *game.Move
 	var moveI int
 	start := time.Now()
 	for time.Since(start) < time.Second*5 {
-		best, moveI, _ = getBestMove(state, moves, player, depth, -bigNum, bigNum, Hash(state))
+		bestOppEval := -bigNum
+		for i := 0; i < len(moves); i++ { //TODO: maybe use concurrency? or multithreaded
+			copiedStateIface, _ := deepcopy.Anything(state)
+			copiedState := copiedStateIface.(*game.State)
+			copiedState.RunMove(moves[i])
+			oppEval := -getBestEval(copiedState, copiedState.GetMoves((player+1)%2), (player+1)%2, depth-1, -bigNum, -bestOppEval, Hash(copiedState))
+			if oppEval > bestOppEval {
+				best = &moves[i]
+				moveI = i
+				bestOppEval = oppEval
+			}
+		}
 		moves = util.RemoveIndex(moves, moveI)
 		moves = append([]game.Move{*best}, moves...) //TODO: multiple move priority
 		fmt.Printf("depth: %v, best: %v\n", depth, best)
@@ -78,7 +90,7 @@ func GetBestMove(state *game.State, player game.Player, ch chan *game.Move) {
 	fmt.Printf("eval for %v: %v\n", game.PlayerToString[player], evalState(state, player, Hash(state)))
 }
 
-func getBestMove(state *game.State, moves []game.Move, player game.Player, depth int, min, max float32, currHash uint64) (*game.Move, int, float32) {
+func getBestEval(state *game.State, moves []game.Move, player game.Player, depth int, min, max float32, currHash uint64) float32 {
 	state.Turn = player
 	bestI := -1
 	bestEval := -bigNum
@@ -93,7 +105,7 @@ func getBestMove(state *game.State, moves []game.Move, player game.Player, depth
 		}
 
 		if captureType == game.King {
-			return &moves[i], i, bigNum - 1
+			return bigNum - 1
 		}
 		oldHash := currHash
 
@@ -102,7 +114,7 @@ func getBestMove(state *game.State, moves []game.Move, player game.Player, depth
 		if depth == 1 {
 			ev = evalState(state, player, currHash)
 		} else {
-			_, _, ev = getBestMove(state, getEngineMoves(state, (player+1)%2), (player+1)%2, depth-1, -max, -min, currHash)
+			ev = getBestEval(state, getEngineMoves(state, (player+1)%2), (player+1)%2, depth-1, -max, -min, currHash)
 			ev = -ev
 			state.Turn = player
 		}
@@ -119,9 +131,9 @@ func getBestMove(state *game.State, moves []game.Move, player game.Player, depth
 		}
 	}
 	if bestI == -1 {
-		return nil, -1, -bigNum
+		return -bigNum
 	}
-	return &moves[bestI], bestI, bestEval
+	return bestEval
 }
 
 var (
