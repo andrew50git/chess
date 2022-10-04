@@ -19,8 +19,16 @@ var (
 	}
 )
 
-var (
+const (
 	bigNum float32 = 10000000
+)
+
+const (
+	startDepth int = 1
+)
+
+var (
+	numNodesVisited uint64 = 0
 )
 
 type transpositionState struct {
@@ -61,16 +69,31 @@ func GetBestMove(state *game.State, player game.Player, ch chan *game.Move) {
 	if isEndGame {
 		pieceMaps[game.King] = kingMapEndGame
 	}
-	depth := 1
+	depth := startDepth
 	moves := getEngineMoves(state, player)
 	var best *game.Move
 	var moveI int
+	var ev float32
 	start := time.Now()
 	for time.Since(start) < time.Second*5 {
-		best, moveI, _ = getBestMove(state, moves, player, depth, -bigNum, bigNum, Hash(state))
+		currStart := time.Now()
+		numNodesVisited = 0
+		if depth == startDepth {
+			best, moveI, ev = getBestMove(state, moves, player, depth, -bigNum, bigNum, Hash(state))
+		} else {
+			best = nil
+			var currWindow float32 = 0.5
+			for best == nil {
+				best, moveI, ev = getBestMove(state, moves, player, depth, ev-currWindow, ev+currWindow, Hash(state))
+				currWindow *= 2
+			}
+		}
 		moves = util.RemoveIndex(moves, moveI)
 		moves = append([]game.Move{*best}, moves...) //TODO: multiple move priority
-		fmt.Printf("depth: %v, best: %v\n", depth, best)
+		fmt.Printf("depth: %v, best: %v, kilo-nodes per second: %v\n", depth, best, float64(numNodesVisited)/time.Since(currStart).Seconds()/1000)
+		if ev == bigNum-1 || ev == -bigNum+1 {
+			break
+		}
 		depth++
 	}
 	ch <- best
@@ -79,6 +102,7 @@ func GetBestMove(state *game.State, player game.Player, ch chan *game.Move) {
 }
 
 func getBestMove(state *game.State, moves []game.Move, player game.Player, depth int, min, max float32, currHash uint64) (*game.Move, int, float32) {
+	numNodesVisited++
 	state.Turn = player
 	bestI := -1
 	bestEval := -bigNum
